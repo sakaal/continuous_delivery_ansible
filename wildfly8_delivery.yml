@@ -1,0 +1,11 @@
+---
+# file: wildfly8_delivery.yml
+
+#
+# Deploy to WildFly 8 application servers
+#
+
+- hosts: wildfly8_servers
+  roles:
+  - wildfly8_deploy
+

@@ -1,0 +1,8 @@
+---
+# file: roles/wildfly8_deploy/tasks/main.yml
+
+#
+# WildFly 8 Java EE Application Server deployment
+#
+
+#TODO:
