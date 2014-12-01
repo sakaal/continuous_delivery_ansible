@@ -2,7 +2,55 @@
 # file: roles/wildfly8_deploy/tasks/main.yml
 
 #
-# WildFly 8 Java EE Application Server deployment
+# Deploy packages from Sonatype Nexus repositories to WildFly servers
+#
+# TODO: Instructions for how to configure the Ansible inventories and group
+# variables using the Jenkins Config File Provider plugin.
 #
 
-#TODO:
+- name: Deliver artifacts from Nexus
+  with_items: delivery_artifacts
+  sudo: yes
+  sudo_user: "{{ wildfly8_user }}"
+  command: chdir="~{{ wildfly8_user }}"
+           creates="{{ item.a }}-{{ item.v }}.{{ item.p }}"
+           wget -nv --user="{{ delivery_user | mandatory }}"
+           --password="{{ delivery_password | mandatory }}"
+           "{{ nexus_url | mandatory
+           }}/service/local/artifact/maven/redirect?r={{ item.r | mandatory
+           }}&g={{ item.g | mandatory }}&a={{ item.a | mandatory
+           }}&v={{ item.v | mandatory }}&p={{ item.p | mandatory
+           }}" -O {{ item.a }}-{{ item.v }}.{{ item.p }}
+  register: delivery
+
+- name: Check artifacts status
+  with_items: delivery.results
+  sudo: yes
+  sudo_user: "{{ wildfly8_user }}"
+  command: chdir="{{ wildfly8_home | mandatory }}"
+           {{ wildfly8_cli | mandatory }} --connect
+           --command='deployment-info --name={{
+           item.item.a }}-{{ item.item.v }}.{{ item.item.p }}'
+  ignore_errors: yes
+  register: component_status
+  changed_when: component_status.rc != 0 or
+                not 'true    OK' in component_status.stdout
+
+- name: Deploy artifacts to WildFly
+  with_items: component_status.results
+  sudo: yes
+  sudo_user: "{{ wildfly8_user }}"
+  command: chdir="{{ wildfly8_home | mandatory }}"
+           {{ wildfly8_cli | mandatory }} --connect
+           --command='deploy /home/{{ wildfly8_user }}/{{
+           item.item.item.a }}-{{ item.item.item.v }}.{{ item.item.item.p
+           }} --force'
+  when: item|changed
+
+#
+# Authorize the jenkins user's SSH key by setting the ssh_access variable
+# (service_platform_ansible/roles/access_control) for the application servers.
+#
+# Manually connect to the target hosts accepting their host keys.
+# TODO: Automate this later.
+#
